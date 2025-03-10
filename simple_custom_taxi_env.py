@@ -50,17 +50,17 @@ class SimpleTaxiEnv(gym.Wrapper):
         obstacle_south = int(taxi_row == self.grid_size - 1)
         obstacle_east  = int(taxi_col == self.grid_size - 1)
         obstacle_west  = int(taxi_col == 0)
-        passenger_loc_north = int( (taxi_row - 1, taxi_col) in self.passenger_loc)
-        passenger_loc_south = int( (taxi_row + 1, taxi_col) in self.passenger_loc)
-        passenger_loc_east  = int( (taxi_row, taxi_col + 1) in self.passenger_loc)
-        passenger_loc_west  = int( (taxi_row, taxi_col - 1) in self.passenger_loc)
-        passenger_loc_middle  = int( (taxi_row, taxi_col) in self.passenger_loc)
+        passenger_loc_north = int( (taxi_row - 1, taxi_col) == self.passenger_loc)
+        passenger_loc_south = int( (taxi_row + 1, taxi_col) == self.passenger_loc)
+        passenger_loc_east  = int( (taxi_row, taxi_col + 1) == self.passenger_loc)
+        passenger_loc_west  = int( (taxi_row, taxi_col - 1) == self.passenger_loc)
+        passenger_loc_middle  = int( (taxi_row, taxi_col) == self.passenger_loc)
         passenger_look = passenger_loc_north or passenger_loc_south or passenger_loc_east or passenger_loc_west or passenger_loc_middle
-        destination_loc_north = int( (taxi_row - 1, taxi_col) in self.destination)
-        destination_loc_south = int( (taxi_row + 1, taxi_col) in self.destination)
-        destination_loc_east  = int( (taxi_row, taxi_col + 1) in self.destination)
-        destination_loc_west  = int( (taxi_row, taxi_col - 1) in self.destination)
-        destination_loc_middle  = int( (taxi_row, taxi_col) in self.destination)
+        destination_loc_north = int( (taxi_row - 1, taxi_col) == self.destination)
+        destination_loc_south = int( (taxi_row + 1, taxi_col) == self.destination)
+        destination_loc_east  = int( (taxi_row, taxi_col + 1) == self.destination)
+        destination_loc_west  = int( (taxi_row, taxi_col - 1) == self.destination)
+        destination_loc_middle  = int( (taxi_row, taxi_col) == self.destination)
         destination_look = destination_loc_north or destination_loc_south or destination_loc_east or destination_loc_west or destination_loc_middle
 
         
