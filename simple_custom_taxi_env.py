@@ -14,13 +14,19 @@ import random
 
 
 class SimpleTaxiEnv():
-    def __init__(self, grid_size=5, fuel_limit=50):
+    def __init__(
+        self,
+        grid_size=5,
+        fuel_limit=50,
+        n_obstacle=0,
+    ):
         """
         Custom Taxi environment supporting different grid sizes.
         """
         self.grid_size = grid_size
         self.fuel_limit = fuel_limit
         self.current_fuel = fuel_limit
+        self.n_obstacle = n_obstacle
         self.passenger_picked_up = False
         
         self.stations = [(0, 0), (0, self.grid_size - 1), (self.grid_size - 1, 0), (self.grid_size - 1, self.grid_size - 1)]
@@ -41,12 +47,25 @@ class SimpleTaxiEnv():
         ]
 
         self.taxi_pos = random.choice(available_positions)
+        # self.taxi_pos = (2, 2)
         
         self.passenger_loc = random.choice([pos for pos in self.stations])
+        # self.passenger_loc = random.choice([self.stations[0], self.stations[1], self.stations[2]])
+        # self.passenger_loc = self.stations[0]
         
         
         possible_destinations = [s for s in self.stations if s != self.passenger_loc]
         self.destination = random.choice(possible_destinations)
+        # self.destination = self.stations[3]
+
+        available_positions = [
+            (x, y)
+            for x in range(self.grid_size)
+            for y in range(self.grid_size)
+            if (x, y) not in self.stations and (x, y) != self.taxi_pos
+        ]
+
+        self.obstacles = set(random.sample(available_positions, self.n_obstacle))
         
         return self.get_state(), {}
 
@@ -95,9 +114,7 @@ class SimpleTaxiEnv():
 
         self.current_fuel -= 1
         if self.current_fuel <= 0:
-            return self.get_state(), reward -10, True, {}
-
-        
+            return self.get_state(), reward, True, {}
 
         return self.get_state(), reward, False, {}
 
@@ -132,30 +149,30 @@ class SimpleTaxiEnv():
     def render_env(self, taxi_pos,   action=None, step=None, fuel=None):
         clear_output(wait=True)
 
-        grid = [['.'] * self.grid_size for _ in range(self.grid_size)]
-        
-        '''
-        # Place passenger
-        py, px = passenger_pos
-        if 0 <= px < self.grid_size and 0 <= py < self.grid_size:
-            grid[py][px] = 'P'
-        '''
-        
+        grid = [['.'] * self.grid_size for _ in range(self.grid_size)]        
         
         grid[0][0]='R'
         grid[0][4]='G'
         grid[4][0]='Y'
         grid[4][4]='B'
-        '''
+        
+        # Place passenger
+        py, px = self.passenger_loc
+        if 0 <= px < self.grid_size and 0 <= py < self.grid_size:
+            grid[py][px] = 'P'
+        
         # Place destination
-        dy, dx = destination_pos
+        dy, dx = self.destination
         if 0 <= dx < self.grid_size and 0 <= dy < self.grid_size:
             grid[dy][dx] = 'D'
-        '''
+        
+        for row, col in self.obstacles:
+            grid[row][col] = "X"
+        
         # Place taxi
         ty, tx = taxi_pos
         if 0 <= tx < self.grid_size and 0 <= ty < self.grid_size:
-            grid[ty][tx] = '🚖'
+            grid[ty][tx] = 'T'
 
         # Print step info
         print(f"\nStep: {step}")
@@ -205,7 +222,7 @@ def run_agent(agent_file, env_config, render=False):
         step_count += 1
 
         taxi_row, taxi_col, _,_,_,_,_,_,_,_,obstacle_north, obstacle_south, obstacle_east, obstacle_west, passenger_look,destination_look = obs
-
+        print(f'reward: {reward}')
         if render:
             env.render_env((taxi_row, taxi_col),
                            action=action, step=step_count, fuel=env.current_fuel)

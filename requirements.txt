@@ -2,3 +2,7 @@ tqdm
 requests
 argparse
 torch
+numpy==1.23.5
+ipython
+torch
+gym
