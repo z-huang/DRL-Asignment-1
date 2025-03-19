@@ -5,33 +5,34 @@ import numpy as np
 from tqdm import tqdm
 from simple_custom_taxi_env import SimpleTaxiEnv
 import matplotlib.pyplot as plt
-from util import StateManager, ACTION_SIZE, reward_shaping
+from state import StateManager, ACTION_SIZE, reward_shaping
 
 
 WIN_SIZE = 1000
 
 def q_learning(
-    episodes=100000,
+    episodes=1000000,
     alpha=0.01,
     gamma=0.999,
     epsilon_start=1.0,
     epsilon_end=0.01,
-    decay_episodes=30000,
-    q_table=None,
+    decay_episodes=400000,
 ) -> Mapping[Tuple, np.ndarray]:
-    q_table = defaultdict(lambda: np.zeros(ACTION_SIZE), q_table or {})
+    state_manager = StateManager()
+    env = SimpleTaxiEnv(fuel_limit=100)
+
+    q_table = defaultdict(lambda: np.zeros(ACTION_SIZE))
+
     epsilon = epsilon_start
     rewards_per_episode = []
     success_per_episode = []
 
     with tqdm(range(episodes)) as pbar:
         for episode in pbar:
-            env = SimpleTaxiEnv(
-                # grid_size=np.random.randint(5, 11),
-                fuel_limit=100)
             obs, _ = env.reset()
-            state_manager = StateManager()
-            state = state_manager.get_state(obs)
+            state_manager.reset()
+            
+            state, info = state_manager.get_state(obs)
             total_reward = 0
             done = success = False
 
@@ -41,20 +42,23 @@ def q_learning(
                 else:
                     action = np.argmax(q_table[state])
 
-                state_manager.update_action(action)
                 obs, reward, done, _ = env.step(action)
-                next_state = state_manager.get_state(obs)
+                state_manager.update_action(action)
+                next_state, next_info = state_manager.get_state(obs)
 
                 if done and reward == 49.9:
                     success = True
-                reward = reward_shaping(reward, state, next_state, obs)
+                reward = reward_shaping(reward, info, next_info)
 
+                # update Q table
                 best_next_action = q_table[next_state].max()
                 q_table[state][action] += alpha * (
                     reward + gamma * best_next_action -
                     q_table[state][action])
+                
                 total_reward += reward
                 state = next_state
+                info = next_info
 
             rewards_per_episode.append(total_reward)
             success_per_episode.append(success)
@@ -65,7 +69,7 @@ def q_learning(
             pbar.set_postfix({
                 'avg reward': np.mean(rewards_per_episode[-WIN_SIZE:]).item(),
                 'win rate': np.mean(success_per_episode[-WIN_SIZE:]).item(),
-                'epsilon': epsilon
+                'epsilon': epsilon,
             })
 
     moving_avg = np.convolve(rewards_per_episode,
@@ -79,16 +83,12 @@ def q_learning(
     plt.xlabel("Episodes")
     plt.ylabel("Total Reward")
     plt.title("Training Progress")
-    plt.savefig('q_learning.png')
+    plt.savefig('graph/q_learning.png')
 
     return dict(q_table)
 
 
 if __name__ == '__main__':
-    q_table = None
-    # with open('q_table.pkl', 'rb') as f:
-    #     q_table = pickle.load(f)
-
     q_table = q_learning()
 
     with open('q_table.pkl', 'wb') as f:

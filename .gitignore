@@ -7,6 +7,3 @@ __pycache__/
 
 # ignore eval.py
 eval.py
-
-*.pkl
-*.png

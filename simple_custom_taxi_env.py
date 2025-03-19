@@ -1,3 +1,4 @@
+from typing import Tuple
 import gym
 import numpy as np
 import importlib.util
@@ -18,56 +19,103 @@ class SimpleTaxiEnv():
         self,
         grid_size=5,
         fuel_limit=50,
-        n_obstacle=0,
     ):
         """
         Custom Taxi environment supporting different grid sizes.
         """
         self.grid_size = grid_size
         self.fuel_limit = fuel_limit
-        self.current_fuel = fuel_limit
-        self.n_obstacle = n_obstacle
-        self.passenger_picked_up = False
-        
-        self.stations = [(0, 0), (0, self.grid_size - 1), (self.grid_size - 1, 0), (self.grid_size - 1, self.grid_size - 1)]
-        self.passenger_loc = None
-       
-        self.obstacles = set()  # No obstacles in simple version
-        self.destination = None
 
     def reset(self):
         """Reset the environment, ensuring Taxi, passenger, and destination are not overlapping obstacles"""
-        self.current_fuel = self.fuel_limit
-        self.passenger_picked_up = False
-        
+        obstacle_map = {
+            10: 10,
+            9: 8,
+            8: 6,
+            7: 4,
+            6: 3,
+            5: 2
+        }
+        self.n_obstacle = obstacle_map[self.grid_size]
 
-        available_positions = [
-            (x, y) for x in range(self.grid_size) for y in range(self.grid_size)
-            if (x, y) not in self.stations and (x, y) not in self.obstacles
-        ]
+        while True:
+            available_positions = [
+                (x, y)
+                for x in range(self.grid_size)
+                for y in range(self.grid_size)
+            ]
 
-        self.taxi_pos = random.choice(available_positions)
-        # self.taxi_pos = (2, 2)
-        
-        self.passenger_loc = random.choice([pos for pos in self.stations])
-        # self.passenger_loc = random.choice([self.stations[0], self.stations[1], self.stations[2]])
-        # self.passenger_loc = self.stations[0]
-        
-        
-        possible_destinations = [s for s in self.stations if s != self.passenger_loc]
-        self.destination = random.choice(possible_destinations)
-        # self.destination = self.stations[3]
+            self.stations = []
+            for _ in range(4):
+                x, y = random.choice(available_positions)
+                self.stations.append((x, y))
+                for dx, dy in [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1)]:
+                    if (x + dx, y + dy) in available_positions:
+                        available_positions.remove((x + dx, y + dy))
+            
+            # self.stations = [(0, 0), (0, self.grid_size - 1), (self.grid_size - 1, 0), (self.grid_size - 1, self.grid_size - 1)]
+            
+            self.current_fuel = self.fuel_limit
+            self.passenger_picked_up = False
+            
+            available_positions = [
+                (x, y) 
+                for x in range(self.grid_size)
+                for y in range(self.grid_size)
+                if (x, y) not in self.stations
+            ]
 
-        available_positions = [
-            (x, y)
-            for x in range(self.grid_size)
-            for y in range(self.grid_size)
-            if (x, y) not in self.stations and (x, y) != self.taxi_pos
-        ]
+            self.taxi_pos = random.choice(available_positions)
+            
+            self.passenger_loc = random.choice(self.stations)
+            
+            self.destination = random.choice([s for s in self.stations 
+                                            if s != self.passenger_loc])
+            # self.destination = self.stations[3]
 
-        self.obstacles = set(random.sample(available_positions, self.n_obstacle))
+            available_positions = [
+                (x, y)
+                for x in range(self.grid_size)
+                for y in range(self.grid_size)
+                if (x, y) not in self.stations and (x, y) != self.taxi_pos
+            ]
+
+            self.obstacles = set(random.sample(available_positions, self.n_obstacle))
+            
+            if self.is_valid():
+                break  
         
         return self.get_state(), {}
+    
+    def is_valid(self):
+        return self.is_reachable(self.taxi_pos, self.passenger_loc) and \
+            self.is_reachable(self.passenger_loc, self.destination)
+
+    def is_reachable(self, p: Tuple[int, int], q: Tuple[int, int]):
+        if p == q:
+            return True
+        
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        queue = [p]
+        visited = set()
+        
+        while queue:
+            x, y = queue.pop(0)
+            if (x, y) == q:
+                return True
+            
+            if (x, y) in visited:
+                continue
+            visited.add((x, y))
+            
+            for dx, dy in directions:
+                nx, ny = x + dx, y + dy
+                if (0 <= nx < self.grid_size and
+                    0 <= ny < self.grid_size and 
+                    (nx, ny) not in self.obstacles):
+                    queue.append((nx, ny))
+        
+        return False
 
     def step(self, action):
         """Perform an action and update the environment state."""
@@ -146,15 +194,13 @@ class SimpleTaxiEnv():
         
         state = (taxi_row, taxi_col, self.stations[0][0],self.stations[0][1] ,self.stations[1][0],self.stations[1][1],self.stations[2][0],self.stations[2][1],self.stations[3][0],self.stations[3][1],obstacle_north, obstacle_south, obstacle_east, obstacle_west, passenger_look, destination_look)
         return state
-    def render_env(self, taxi_pos,   action=None, step=None, fuel=None):
+    def render_env(self, taxi_pos, action=None, step=None, fuel=None):
         clear_output(wait=True)
 
         grid = [['.'] * self.grid_size for _ in range(self.grid_size)]        
         
-        grid[0][0]='R'
-        grid[0][4]='G'
-        grid[4][0]='Y'
-        grid[4][4]='B'
+        for (x, y), label in zip(self.stations, ['R', 'G', 'Y', 'B']):
+            grid[x][y] = label
         
         # Place passenger
         py, px = self.passenger_loc
@@ -193,12 +239,15 @@ class SimpleTaxiEnv():
         return actions[action] if action is not None else "None"
 
 
-def run_agent(agent_file, env_config, render=False):
+def run_agent(agent_file, render=False):
     spec = importlib.util.spec_from_file_location("student_agent", agent_file)
     student_agent = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(student_agent)
 
-    env = SimpleTaxiEnv(**env_config)
+    env = SimpleTaxiEnv(
+        fuel_limit=5000,
+        grid_size=np.random.randint(5, 11),
+    )
     obs, _ = env.reset()
     total_reward = 0
     done = False
@@ -230,10 +279,6 @@ def run_agent(agent_file, env_config, render=False):
     print(f"Agent Finished in {step_count} steps, Score: {total_reward}")
     return total_reward
 
-if __name__ == "__main__":
-    env_config = {
-        "fuel_limit": 5000
-    }
-    
-    agent_score = run_agent("student_agent.py", env_config, render=True)
+if __name__ == "__main__":    
+    agent_score = run_agent("student_agent.py", render=True)
     print(f"Final Score: {agent_score}")
