@@ -1,3 +1,4 @@
+from collections import defaultdict
 from enum import IntEnum
 from types import SimpleNamespace
 from typing import Optional, Tuple
@@ -85,7 +86,8 @@ class StateManager:
         self.station_type = [StationType.UNKNOWN] * 4
         self.passenger_pos = None
         self.prev_action: Optional[Action] = None
-        self.visited_states = set()
+        self.state_visit_count = defaultdict(lambda: 0)
+        self.step = 0
 
     def get_state(self, obs) -> Tuple[Tuple, SimpleNamespace]:
         # Read observation
@@ -167,21 +169,16 @@ class StateManager:
         left = int(self.target[0] < self.taxi_pos[0])
         right = int(self.target[0] > self.taxi_pos[0])
 
-        self.visited_states.add((self.taxi_pos, self.picked_up))
+        self.state_visit_count[(*self.taxi_pos, self.picked_up)] += 1
 
-        x, y = self.taxi_pos
-        visited = [int(((x + dx, y + dy), self.picked_up)
-                       in self.visited_states)
-                   for dx, dy in [(1, 0), (0, 1), (-1, 0), (0, -1)]]
+        self.step += 1
 
         state = (
             *self.obstacles,
             self.can_pickup,
             self.can_dropoff,
-            up,
-            down,
-            left,
-            right,
+            self.target[0] - self.taxi_pos[0],
+            self.target[1] - self.taxi_pos[1],
         )
         info = SimpleNamespace(**vars(self))
 
@@ -196,32 +193,28 @@ class StateManager:
             self.picked_up = False
 
     @property
-    def state_shape(self):
-        return (*[2, 2, 2, 2], 2, 2, *[2, 2, 2, 2])
-
-    @property
     def state_size(self):
-        return len(self.state_shape)
+        return len(StateManager().get_state([0] * 16)[0])
 
 
 def reward_shaping(reward, info: SimpleNamespace, next_info: SimpleNamespace) -> float:
     if reward == 50 - 0.1:  # finish
         reward = 50
     elif reward == -10.1:  # Incorrect PICKUP or DROPOFF
-        reward = -10
+        reward = -50
     elif reward == -5.1:  # hit an obstacle
-        reward = -10
+        reward = -50
     elif reward == -0.1:  # move
         reward = -0.1
 
     if not info.picked_up and next_info.picked_up:  # pickup
-        reward += 10
+        reward += 20
     elif info.picked_up and not next_info.picked_up and not info.can_dropoff:
-        reward -= 15
+        reward -= 22
     if sum(x == StationType.UNKNOWN for x in info.station_type) > \
             sum(x == StationType.UNKNOWN for x in next_info.station_type):
         # visit new station
-        reward += 10
+        reward += 15
     if info.target == next_info.target:
         reward += 0.1 * (distance(info.taxi_pos, info.target) -
                          distance(next_info.taxi_pos, next_info.target))

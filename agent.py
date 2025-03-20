@@ -46,12 +46,13 @@ class QTableAgent(Agent):
 class PolicyGradientAgent(Agent):
     def __init__(self, path):
         self.state_manager = StateManager()
-        self.table = PolicyNetwork(self.state_manager.state_size, ACTION_SIZE)
-        self.table.load_state_dict(torch.load(path, map_location='cpu'))
+        self.policy = PolicyNetwork(self.state_manager.state_size, ACTION_SIZE)
+        self.policy.load_state_dict(torch.load(path, map_location='cpu'))
+        self.policy.eval()
 
     @torch.no_grad()
     def get_action(self, obs):
         state, _ = self.state_manager.get_state(obs)
-        action = self.table.get_action(state)
+        action = self.policy.get_action(state)
         self.state_manager.update_action(action)
         return action

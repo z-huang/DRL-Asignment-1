@@ -1,51 +1,21 @@
-from typing import Tuple
+from typing import Optional
 import numpy as np
 import torch
 from torch import nn, optim
-import torch.nn.functional as F
 from tqdm import tqdm
 from simple_custom_taxi_env import SimpleTaxiEnv
 import matplotlib.pyplot as plt
 from state import StateManager, ACTION_SIZE, reward_shaping
-from taxi import TaxiEnv
+import argparse
 
 WIN_SIZE = 100
 
 
-class PolicyTable(nn.Module):
-    def __init__(self, state_size, num_actions, lr=0.1):
-        super().__init__()
-        self.table = nn.Parameter(
-            torch.zeros(state_size + (num_actions,)))
-        self.optimizer = optim.Adam(self.parameters(), lr=lr)
-
-    def forward(self, state):
-        state = tuple(state.long().tolist())
-        logits = self.table[state]
-        probs = F.softmax(logits, dim=-1)
-        return probs
-
-    @torch.no_grad()
-    def get_action(self, state: Tuple):
-        probs = self(state)
-        action = torch.multinomial(probs, 1).item()
-        return action
-
-    def update(self, state: Tuple, action: int, reward: float):
-        logits = self.table[state]
-        log_probs = F.log_softmax(logits, dim=-1)
-        loss = -log_probs[action] * reward
-
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim, action_dim, hidden_dim=8):
         super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_dim, 16)
-        self.fc2 = nn.Linear(16, action_dim)
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, action_dim)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, state):
@@ -63,12 +33,15 @@ class PolicyNetwork(nn.Module):
 def train(
     episodes: int = 8000,
     lr: float = 0.01,
-    gamma: float = 0.99,
-    output_path: str = 'checkpoints/pg.pth'
+    gamma: float = 0.8,
+    output_path: str = 'checkpoints/pg.pth',
+    checkpoint_path: Optional[str] = None
 ):
     state_manager = StateManager()
     states_visited = set()
     policy = PolicyNetwork(state_manager.state_size, ACTION_SIZE)
+    if checkpoint_path is not None:
+        policy.load_state_dict(torch.load(checkpoint_path))
     optimizer = optim.Adam(policy.parameters(), lr=lr)
 
     rewards_per_episode = []
@@ -79,7 +52,9 @@ def train(
         for episode in pbar:
             env = SimpleTaxiEnv(
                 fuel_limit=1000,
-                grid_size=np.random.randint(5, 11)
+                grid_size=np.random.randint(5, 11),
+                difficulty='normal' if episode < episodes / 3 else 'hard'
+                # difficulty='hard'
             )
 
             log_probs = []
@@ -99,7 +74,6 @@ def train(
                 action = action_dist.sample()
                 log_probs.append(action_dist.log_prob(action))
 
-                # policy.update_action(action)
                 state_manager.update_action(action.item())
 
                 obs, reward, done, _ = env.step(action.item())
@@ -140,7 +114,7 @@ def train(
             optimizer.step()
 
             pbar.set_postfix({
-                'avg reward': np.mean(rewards_per_episode[-WIN_SIZE:]).item(),
+                'reward': np.mean(rewards_per_episode[-WIN_SIZE:]).item(),
                 'win rate': np.mean(success_per_episode[-WIN_SIZE:]).item(),
                 'step': np.mean(steps_per_episode[-WIN_SIZE:]).item(),
                 'state': len(states_visited)
@@ -164,4 +138,17 @@ def train(
 
 
 if __name__ == '__main__':
-    train()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-o', '--output',
+                        type=str,
+                        default='checkpoints/pg.pth')
+    parser.add_argument('--checkpoint', type=str, default=None)
+    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--gamma', type=float, default=0.99)
+    args = parser.parse_args()
+    train(
+        lr=args.lr,
+        gamma=args.gamma,
+        output_path=args.output,
+        checkpoint_path=args.checkpoint,
+    )

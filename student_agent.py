@@ -1,8 +1,6 @@
-from agent import HumanAgent, QTableAgent, PolicyGradientAgent
+from agent import PolicyGradientAgent
 
-agent = HumanAgent()
-# agent = QTableAgent("checkpoints/q_table.pkl")
-# agent = PolicyGradientAgent('checkpoints/pg.pth')
+agent = PolicyGradientAgent('checkpoints/pg.pth')
 
 
 def get_action(obs):
