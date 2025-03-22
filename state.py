@@ -4,9 +4,11 @@ from types import SimpleNamespace
 from typing import Optional, Tuple
 import torch
 
-from util import distance
-
 ACTION_SIZE = 6
+
+
+def distance(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
 class Action(IntEnum):
@@ -25,44 +27,6 @@ class Action(IntEnum):
     @classmethod
     def empty_onehot(cls):
         return [0] * (len(cls))
-
-
-class Direction(IntEnum):
-    HERE = 0
-    LEFT = 1
-    RIGHT = 2
-    UP = 3
-    DOWN = 4
-    FIRST_Q = 5
-    SECOND_Q = 6
-    THIRD_Q = 7
-    FOURTH_Q = 8
-
-    def get(src, dest):
-        def cmp(a, b):
-            if a == b:
-                return 0
-            if a < b:
-                return 1
-            else:
-                return -1
-        mapping = {
-            (0, 0): Direction.HERE,
-            (1, 0): Direction.RIGHT,
-            (0, 1): Direction.UP,
-            (-1, 0): Direction.LEFT,
-            (0, -1): Direction.DOWN,
-            (1, 1): Direction.FIRST_Q,
-            (-1, 1): Direction.SECOND_Q,
-            (-1, -1): Direction.THIRD_Q,
-            (1, -1): Direction.FOURTH_Q
-        }
-        return mapping[(cmp(src[0], dest[0]), cmp(src[1], dest[1]))]
-
-    def to_onehot(self):
-        onehot = [0] * (len(self.__class__))
-        onehot[self.value] = 1
-        return onehot
 
 
 class StationType(IntEnum):

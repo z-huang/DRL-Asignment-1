@@ -1,6 +1,6 @@
 from agent import PolicyGradientAgent
 
-agent = PolicyGradientAgent('checkpoints/pg.pth')
+agent = PolicyGradientAgent('pg.pth')
 
 
 def get_action(obs):

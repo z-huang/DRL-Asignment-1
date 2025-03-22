@@ -1,18 +1,10 @@
 from collections import defaultdict
 from typing import Literal, Tuple
-import gym
 import numpy as np
 import importlib.util
 import time
 from IPython.display import clear_output
 import random
-# This environment allows you to verify whether your program runs correctly during testing,
-# as it follows the same observation format from `env.reset()` and `env.step()`.
-# However, keep in mind that this is just a simplified environment.
-# The full specifications for the real testing environment can be found in the provided spec.
-#
-# You are free to modify this file to better match the real environment and train your own agent.
-# Good luck!
 
 
 class SimpleTaxiEnv():

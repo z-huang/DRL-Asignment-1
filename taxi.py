@@ -1,6 +1,5 @@
 import gym
 import importlib.util
-import time
 
 import imageio
 import numpy as np
